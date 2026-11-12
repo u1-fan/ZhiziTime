@@ -10,49 +10,45 @@ struct ClockPreviewConsole: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(spacing: 7) {
-                    Circle().fill(ConsoleStyle.cyan).frame(width: 5, height: 5)
-                    Text("时序观测")
-                        .font(.system(size: 12, weight: .medium))
-                    Spacer()
-                    Text("TEMPORAL CORE")
-                        .font(ConsoleStyle.telemetry(9))
-                        .tracking(1.5)
-                        .foregroundStyle(ConsoleStyle.muted)
-                }
-                temporalCore
-                HStack {
-                    Text("桌面投影")
-                        .font(.system(size: 10, weight: .medium))
-                    Spacer()
-                    Text("01 / LIVE VIEW")
-                        .font(ConsoleStyle.telemetry(8))
-                        .foregroundStyle(ConsoleStyle.cyan)
-                }
-                preview
-                HStack {
-                    Label("预览背景", systemImage: "circle.lefthalf.filled")
-                        .font(.system(size: 11))
-                        .foregroundStyle(ConsoleStyle.muted)
-                    Spacer()
-                    Picker("预览背景", selection: $lightBackground) {
-                        Text("深色").tag(false)
-                        Text("浅色").tag(true)
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 112)
-                }
-                .padding(.top, -4)
-                telemetry
-                missionNote
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 7) {
+                Circle().fill(ConsoleStyle.cyan).frame(width: 5, height: 5)
+                Text("时间预览")
+                    .font(.system(size: 12, weight: .medium))
+                Spacer()
+                Text("实时更新")
+                    .font(.system(size: 10))
+                    .foregroundStyle(ConsoleStyle.muted)
             }
-            .padding(20)
+            temporalCore
+            HStack {
+                Text("桌面预览")
+                    .font(.system(size: 10, weight: .medium))
+                Spacer()
+                Text("实时预览")
+                    .font(.system(size: 10))
+                    .foregroundStyle(ConsoleStyle.cyan)
+            }
+            preview
+            HStack {
+                Label("预览背景", systemImage: "circle.lefthalf.filled")
+                    .font(.system(size: 11))
+                    .foregroundStyle(ConsoleStyle.muted)
+                Spacer()
+                Picker("预览背景", selection: $lightBackground) {
+                    Text("深色").tag(false)
+                    Text("浅色").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(width: 112)
+            }
+            .padding(.top, -4)
+            telemetry
+            missionNote
         }
-        .scrollIndicators(.hidden)
-        .frame(maxHeight: .infinity)
+        .padding(10)
+        .frame(maxHeight: .infinity, alignment: .top)
         .background {
             HUDCutout()
                 .fill(ConsoleStyle.surface.opacity(0.6))
@@ -73,7 +69,7 @@ struct ClockPreviewConsole: View {
                     .offset(y: -99)
                     .rotationEffect(.degrees(Double(Calendar.current.component(.second, from: context.date)) * 6))
                 VStack(spacing: 10) {
-                    Text("本 地 时 间")
+                    Text("本地时间")
                         .font(.system(size: 9))
                         .foregroundStyle(ConsoleStyle.muted)
                     Text(context.date, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).second(.twoDigits))
@@ -89,15 +85,15 @@ struct ClockPreviewConsole: View {
                         .foregroundStyle(ConsoleStyle.muted)
                 }
             }
-            .frame(height: 230)
+            .frame(height: 120)
             .overlay(alignment: .topLeading) {
-                Text("T+LOCAL")
-                    .font(ConsoleStyle.telemetry(8))
+                Text("本地时间")
+                    .font(.system(size: 8))
                     .foregroundStyle(ConsoleStyle.amber)
             }
             .overlay(alignment: .bottomTrailing) {
-                Text("1 Hz / 系统时钟")
-                    .font(ConsoleStyle.telemetry(8))
+                Text("每秒更新")
+                    .font(.system(size: 8))
                     .foregroundStyle(ConsoleStyle.muted)
             }
         }
@@ -110,8 +106,7 @@ struct ClockPreviewConsole: View {
                     Circle().fill(ConsoleStyle.muted.opacity(0.4)).frame(width: 4, height: 4)
                 }
                 Spacer()
-                Text("DESKTOP / 01").font(ConsoleStyle.telemetry(7))
-                    .tracking(1)
+                Text("桌面时间").font(.system(size: 8))
                     .foregroundStyle(ConsoleStyle.muted)
             }
             .padding(10)
@@ -129,7 +124,7 @@ struct ClockPreviewConsole: View {
                 .compositingGroup()
                 .clipped()
             }
-            .frame(height: 280 * screenSize.height / screenSize.width)
+            .frame(height: 160 * screenSize.height / screenSize.width)
             .accessibilityLabel("桌面时间实时预览，当前位置\(settings.position.title)")
 
             HStack {
@@ -182,9 +177,9 @@ struct ClockPreviewConsole: View {
     }
 
     private var telemetry: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("当前配置 / READOUT")
-                .font(ConsoleStyle.telemetry(9))
+        VStack(alignment: .leading, spacing: 8) {
+            Text("当前设置")
+                .font(.system(size: 10, weight: .medium))
                 .tracking(1)
                 .foregroundStyle(ConsoleStyle.muted)
             readout("定位锚点", value: settings.position.title)
@@ -194,14 +189,14 @@ struct ClockPreviewConsole: View {
     }
 
     private var missionNote: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 6) {
-                Image(systemName: "waveform.path")
-                Text("时间，始终在场。")
+                Image(systemName: "clock")
+                Text("桌面时间")
             }
             .font(.system(size: 12, weight: .medium))
             .foregroundStyle(ConsoleStyle.cyan)
-            Text("悬浮于桌面之上，在每个空间与你同步。")
+            Text("时间会显示在桌面上，并按当前设置实时更新。")
                 .font(.system(size: 10))
                 .foregroundStyle(ConsoleStyle.muted)
                 .fixedSize(horizontal: false, vertical: true)

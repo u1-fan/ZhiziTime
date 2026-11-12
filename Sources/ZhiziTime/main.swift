@@ -110,6 +110,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.title = "智子时间设置"
             window.titleVisibility = .hidden
             window.titlebarAppearsTransparent = true
+            // 扩大无控件背景区域的拖动范围，避免只能抓住最顶部标题栏移动窗口。
+            window.isMovableByWindowBackground = true
             window.backgroundColor = NSColor(red: 0.025, green: 0.045, blue: 0.065, alpha: 1)
             window.minSize = NSSize(width: 980, height: 720)
             window.contentView = hostingView
@@ -140,6 +142,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 final class ZhiziPanel: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
+}
+
+struct WindowDragArea: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        WindowDragView()
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class WindowDragView: NSView {
+    override var mouseDownCanMoveWindow: Bool { true }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
+    }
 }
 
 @MainActor
@@ -272,9 +292,9 @@ enum ClockFormat: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .chinese: return "2026年11月12日 01:20:45"
-        case .iso: return "2026-11-12 01:20:45"
-        case .slash: return "2026/11/12 01:20:45"
+        case .chinese: return "年-月-日 时:分:秒"
+        case .iso: return "yyyy-MM-dd HH:mm:ss"
+        case .slash: return "yyyy/MM/dd HH:mm:ss"
         case .custom: return "自定义格式"
         }
     }

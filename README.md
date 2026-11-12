@@ -14,19 +14,19 @@
 ## 构建和运行
 
 ```bash
-task         # 显示任务列表
-task doctor  # 显示工具版本及 macOS SDK 路径
-task check   # 检查包结构并编译 debug 版本
-task test    # 运行 Swift 渲染回归测试和 macOS 工作流测试
-task build   # 只构建当前架构的 release 可执行文件
-task app     # 构建并打包 dist/ZhiziTime.app，使用临时签名并校验
-task verify  # 校验已有 .app，不构建或启动
-task install # 将已有 .app 安装到 ~/Applications，不构建或启动
-task launch  # 打开已有 .app，最多等待 10 秒确认对应路径的进程
-task run     # 按顺序执行 app、launch
-task logs    # 持续查看应用的系统日志，按 Ctrl-C 退出
-task workflow:test # 用替身命令验证打包、安装回滚和启动判断
-task clean   # 删除仓库内的 .build 和 dist
+task                     # 显示任务列表
+task macos:doctor        # 显示工具版本及 macOS SDK 路径
+task macos:check         # 检查包结构并编译 debug 版本
+task macos:test          # 运行 Swift 渲染回归测试和 macOS 工作流测试
+task macos:build         # 只构建当前架构的 release 可执行文件
+task macos:app           # 构建并打包 dist/ZhiziTime.app，使用临时签名并校验
+task macos:verify        # 校验已有 .app，不构建或启动
+task macos:install       # 将已有 .app 安装到 ~/Applications，不构建或启动
+task macos:launch        # 打开已有 .app，最多等待 10 秒确认对应路径的进程
+task macos:run           # 按顺序执行 macos:app、macos:launch
+task macos:logs          # 持续查看应用的系统日志，按 Ctrl-C 退出
+task macos:workflow:test # 用替身命令验证打包、安装回滚和启动判断
+task macos:clean         # 删除仓库内的 .build 和 dist
 ```
 
 所有任务仅在 macOS 上执行。从仓库子目录调用时，工作目录仍固定在仓库根目录。
@@ -40,9 +40,9 @@ task clean   # 删除仓库内的 .build 和 dist
 可以指定安装目录和已有应用路径：
 
 ```bash
-task install INSTALL_DIR="/Applications"
-task install INSTALL_DIR="临时 安装" APP_DIR="dist/ZhiziTime.app"
-task launch APP_DIR="$HOME/Applications/ZhiziTime.app"
+task macos:install INSTALL_DIR="/Applications"
+task macos:install INSTALL_DIR="临时 安装" APP_DIR="dist/ZhiziTime.app"
+task macos:launch APP_DIR="$HOME/Applications/ZhiziTime.app"
 ```
 
 `BUILD_DIR` 默认为 `.build/release`，表示打包时读取可执行文件的目录，不改变 SwiftPM 构建位置；`APP_DIR` 默认为 `dist/ZhiziTime.app`，`INSTALL_DIR` 默认为 `~/Applications`。相对路径均以仓库根目录为基准，路径含空格或中文时需加引号。Task 命令行传入的变量优先于宿主同名环境变量；任务不透传 `--` 后的额外参数，也不自动提权。`clean` 只清理仓库内默认产物，不清理自定义路径或已安装应用。

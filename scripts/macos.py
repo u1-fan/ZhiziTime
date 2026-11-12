@@ -40,7 +40,7 @@ def executable(app):
 
 def verify(app):
     if not app.is_dir():
-        raise ValueError(f"找不到应用包，请先运行 task app：{app}")
+        raise ValueError(f"找不到应用包，请先运行 task macos:app：{app}")
     with (app / "Contents" / "Info.plist").open("rb") as stream:
         info = plistlib.load(stream)
     expected = {

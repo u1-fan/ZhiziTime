@@ -113,7 +113,7 @@ class WorkflowTests(unittest.TestCase):
         self.calls.unlink(missing_ok=True)
 
     def test_package_from_subdirectory_and_space_path(self):
-        self.task("app")
+        self.task("macos:app")
         self.assertEqual(macos.executable(self.app).read_bytes(), b"new executable")
         with (self.app / "Contents/Info.plist").open("rb") as stream:
             self.assertEqual(plistlib.load(stream)["CFBundleIdentifier"], "com.brian.zhizitime")
@@ -132,18 +132,18 @@ class WorkflowTests(unittest.TestCase):
         binary.chmod(0o755)
         app = self.root / "dist" / '智子 "raw" $literal `true`.app'
         directory = self.root / '安装 "raw" $literal `true`'
-        self.task("app", f"APP_DIR={app}", f"BUILD_DIR={build}")
+        self.task("macos:app", f"APP_DIR={app}", f"BUILD_DIR={build}")
         self.assertEqual(macos.executable(app).read_bytes(), b"selected executable")
-        self.task("install", f"APP_DIR={app}", f"INSTALL_DIR={directory}")
+        self.task("macos:install", f"APP_DIR={app}", f"INSTALL_DIR={directory}")
         target = directory / "ZhiziTime.app"
         self.assertEqual(snapshot(target), snapshot(app))
-        self.task("launch", f"APP_DIR={target}")
+        self.task("macos:launch", f"APP_DIR={target}")
         opened = [args for name, args, _ in self.recorded() if name == "open"]
         self.assertEqual(opened, [["-n", str(target)]])
 
     def test_build_failure_stops_package_and_launch(self):
         self.env["FAIL_BUILD"] = "1"
-        self.task("run", success=False)
+        self.task("macos:run", success=False)
         self.assertEqual([entry[0] for entry in self.recorded()], ["swift"])
         self.assertFalse(self.app.exists())
 
@@ -152,16 +152,16 @@ class WorkflowTests(unittest.TestCase):
         target.mkdir(parents=True)
         (target / "old").write_bytes(b"previous version")
         before = snapshot(target)
-        self.task("install", "INSTALL_DIR=安装 目录", success=False)
+        self.task("macos:install", "INSTALL_DIR=安装 目录", success=False)
         self.assertEqual(snapshot(target), before)
         self.assertEqual(self.recorded(), [])
 
     def test_install_only_and_command_variable_precedence(self):
-        self.task("app")
+        self.task("macos:app")
         self.reset_calls()
         self.env["INSTALL_DIR"] = str(self.root / "wrong install")
         self.env["APP_DIR"] = str(self.root / "missing.app")
-        self.task("install", "INSTALL_DIR=安装 目录", "APP_DIR=dist/ZhiziTime.app")
+        self.task("macos:install", "INSTALL_DIR=安装 目录", "APP_DIR=dist/ZhiziTime.app")
         target = self.root / "安装 目录" / "ZhiziTime.app"
         self.assertEqual(snapshot(target), snapshot(self.app))
         self.assertFalse((self.root / "wrong install").exists())
@@ -171,18 +171,18 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(all("--sign" not in entry[1] for entry in self.recorded()))
 
     def test_final_signature_failure_restores_previous_bytes(self):
-        self.task("app")
-        self.task("install", "INSTALL_DIR=安装 目录")
+        self.task("macos:app")
+        self.task("macos:install", "INSTALL_DIR=安装 目录")
         target = self.root / "安装 目录" / "ZhiziTime.app"
         macos.executable(target).write_bytes(b"old executable")
         before = snapshot(target)
         self.env["FAIL_VERIFY"] = str(target)
-        self.task("install", "INSTALL_DIR=安装 目录", success=False)
+        self.task("macos:install", "INSTALL_DIR=安装 目录", success=False)
         self.assertEqual(snapshot(target), before)
         self.assertEqual(list(target.parent.glob(".zhizi-install-*")), [])
 
     def test_copy_and_staged_verification_failure_preserve_previous_bytes(self):
-        self.task("app")
+        self.task("macos:app")
         target = self.root / "安装 目录" / "ZhiziTime.app"
         target.mkdir(parents=True)
         (target / "old").write_bytes(b"keep me")
@@ -199,17 +199,17 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(snapshot(target), before)
 
     def test_running_target_is_not_overwritten(self):
-        self.task("app")
-        self.task("install", "INSTALL_DIR=安装 目录")
+        self.task("macos:app")
+        self.task("macos:install", "INSTALL_DIR=安装 目录")
         target = self.root / "安装 目录" / "ZhiziTime.app"
         before = snapshot(target)
         self.env["WORKFLOW_PS"] = f"123 {macos.executable(target)}"
-        self.task("install", "INSTALL_DIR=安装 目录", success=False)
+        self.task("macos:install", "INSTALL_DIR=安装 目录", success=False)
         self.assertEqual(snapshot(target), before)
 
     def test_launch_matches_full_path_and_run_order(self):
         self.env["WORKFLOW_PS"] = "123 /unrelated/ZhiziTime.app/Contents/MacOS/ZhiziTime"
-        self.task("run")
+        self.task("macos:run")
         calls = self.recorded()
         opened = next(i for i, entry in enumerate(calls) if entry[0] == "open")
         self.assertTrue(any(entry[0] == "codesign" for entry in calls[:opened]))

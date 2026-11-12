@@ -8,22 +8,20 @@ struct ClockSettingsView: View {
         VStack(spacing: 0) {
             header
             terminalStrip
-            HStack(alignment: .top, spacing: 22) {
-                ScrollView {
-                    VStack(spacing: 14) {
-                        appearance
+            HStack(alignment: .top, spacing: 16) {
+                VStack(spacing: 12) {
+                    appearance
+                    HStack(alignment: .top, spacing: 12) {
                         placement
                         timeFormat
                     }
-                    .padding(1)
                 }
-                .scrollIndicators(.hidden)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, alignment: .top)
 
                 ClockPreviewConsole(settings: settings)
-                    .frame(width: 354)
+                    .frame(width: 330)
             }
-            .padding(24)
+            .padding(18)
             .frame(maxHeight: .infinity, alignment: .top)
             footer
         }
@@ -50,12 +48,10 @@ struct ClockSettingsView: View {
         HStack(spacing: 15) {
             OrbitalMark()
             VStack(alignment: .leading, spacing: 5) {
-                Text("智子 / 时序控制")
+                Text("智子时间")
                     .font(.system(size: 26, weight: .light))
-                    .tracking(5)
-                Text("ZHIZI  :  TEMPORAL OBSERVATORY")
-                    .font(ConsoleStyle.telemetry(9))
-                    .tracking(2)
+                Text("桌面时钟设置")
+                    .font(.system(size: 10))
                     .foregroundStyle(ConsoleStyle.muted)
             }
             Spacer()
@@ -83,18 +79,18 @@ struct ClockSettingsView: View {
             VStack(alignment: .trailing, spacing: 7) {
                 HStack(spacing: 6) {
                     Circle().fill(ConsoleStyle.cyan).frame(width: 5, height: 5)
-                    Text("本地时钟已连接")
+                    Text("时钟运行中")
                         .font(.system(size: 11))
                 }
-                Text("LOCAL TIME / LINKED")
-                    .font(ConsoleStyle.telemetry(9))
-                    .tracking(1)
+                Text("按系统时间更新")
+                    .font(.system(size: 9))
                     .foregroundStyle(ConsoleStyle.muted)
             }
         }
         .padding(.horizontal, 28)
         .padding(.top, 19)
         .padding(.bottom, 21)
+        .background(WindowDragArea())
     }
 
     private var terminalStrip: some View {
@@ -107,10 +103,10 @@ struct ClockSettingsView: View {
                         .rotationEffect(.degrees(15))
                 }
             }
-            Text("时钟配置终端")
+            Text("显示设置")
                 .font(.system(size: 10, weight: .medium))
-            Text("// CONFIGURATION")
-                .font(ConsoleStyle.telemetry(9))
+            Text("字体、颜色、位置和时间格式")
+                .font(.system(size: 9))
                 .foregroundStyle(ConsoleStyle.muted)
             Spacer()
             Text("自动保存")
@@ -128,11 +124,11 @@ struct ClockSettingsView: View {
     }
 
     private var appearance: some View {
-        ConsolePanel(index: "01", title: "显示样式", code: "APPEARANCE") {
+        ConsolePanel(index: "01", title: "显示样式", code: "外观") {
             VStack(spacing: 15) {
                 HStack(spacing: 20) {
                     VStack(alignment: .leading, spacing: 8) {
-                        fieldLabel("字体", detail: "TYPEFACE")
+                        fieldLabel("字体", detail: "字体")
                         Button {
                             showsFontLibrary = true
                         } label: {
@@ -155,7 +151,7 @@ struct ClockSettingsView: View {
                         }
                     }
                     VStack(alignment: .leading, spacing: 8) {
-                        fieldLabel("字体颜色", detail: "COLOR")
+                        fieldLabel("字体颜色", detail: "颜色")
                         consoleMenu("字体颜色", value: settings.colorMode.title) {
                             Picker("字体颜色", selection: $settings.colorMode) {
                                 ForEach(ClockColor.allCases) { color in
@@ -166,7 +162,7 @@ struct ClockSettingsView: View {
                     }
                 }
                 HStack {
-                    fieldLabel("字重", detail: "WEIGHT")
+                    fieldLabel("字重", detail: "粗细")
                         .frame(width: 90)
                     ForEach(ClockWeight.allCases) { weight in
                         Button {
@@ -196,11 +192,11 @@ struct ClockSettingsView: View {
                 }
                 Rectangle().fill(ConsoleStyle.line).frame(height: 1)
                 consoleSlider(
-                    "字号", detail: "FONT SIZE", value: $settings.fontSize,
+                    "字号", detail: "大小", value: $settings.fontSize,
                     range: 16...120, step: 1, readout: "\(Int(settings.fontSize))", unit: "PT"
                 )
                 consoleSlider(
-                    "不透明度", detail: "OPACITY", value: $settings.opacity,
+                    "不透明度", detail: "透明度", value: $settings.opacity,
                     range: 0.05...1, step: 0.01, readout: "\(Int((settings.opacity * 100).rounded()))", unit: "%"
                 )
             }
@@ -208,7 +204,7 @@ struct ClockSettingsView: View {
     }
 
     private var placement: some View {
-        ConsolePanel(index: "02", title: "空间定位", code: "POSITION") {
+        ConsolePanel(index: "02", title: "空间定位", code: "位置") {
             HStack(spacing: 22) {
                 positionMap
                 VStack(alignment: .leading, spacing: 9) {
@@ -263,7 +259,7 @@ struct ClockSettingsView: View {
     }
 
     private var timeFormat: some View {
-        ConsolePanel(index: "03", title: "时间格式", code: "TIME FORMAT") {
+        ConsolePanel(index: "03", title: "时间格式", code: "格式") {
             VStack(alignment: .leading, spacing: 10) {
                 consoleMenu("时间格式", value: settings.format.title) {
                     Picker("时间格式", selection: $settings.format) {

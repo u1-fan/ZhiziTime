@@ -41,7 +41,7 @@ struct ConsolePanel<Content: View>: View {
     @ViewBuilder var content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 17) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 9) {
                 Text(index)
                     .font(ConsoleStyle.telemetry(12))
@@ -62,7 +62,7 @@ struct ConsolePanel<Content: View>: View {
                 .padding(.top, -8)
             content
         }
-        .padding(18)
+        .padding(14)
         .background(ConsoleStyle.surface.opacity(0.8))
         .clipShape(HUDCutout())
         .overlay { HUDFrame() }

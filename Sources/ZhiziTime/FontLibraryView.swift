@@ -17,7 +17,7 @@ struct FontLibraryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("字体库 / TYPE ARCHIVE")
+                Text("选择字体")
                     .font(.system(size: 16, weight: .medium))
                 Spacer()
                 Button { dismiss() } label: {
