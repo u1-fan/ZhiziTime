@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+  <linearGradient id="tile" x2="0.8" y2="1"><stop stop-color="#22262c"/><stop offset="1" stop-color="#050608"/></linearGradient>
+  <radialGradient id="sphere" cx="31%" cy="21%" r="80%"><stop stop-color="#fafbfc"/><stop offset=".16" stop-color="#b8c3ce"/><stop offset=".35" stop-color="#54616f"/><stop offset=".57" stop-color="#111922"/><stop offset=".82" stop-color="#040609"/><stop offset=".97" stop-color="#404b57"/><stop offset="1" stop-color="#aab9c6"/></radialGradient>
+  <linearGradient id="rim"><stop stop-color="#f4f8ff"/><stop offset=".45" stop-color="#798792"/><stop offset="1" stop-color="#1d232b"/></linearGradient>
+  <clipPath id="ball"><circle cx="512" cy="480" r="294"/></clipPath>
+  <filter id="blur"><feGaussianBlur stdDeviation="20"/></filter>
+  <filter id="red"><feGaussianBlur stdDeviation="4"/></filter>
+</defs>
+<rect x="64" y="64" width="896" height="896" rx="198" fill="url(#tile)"/>
+<rect x="65" y="65" width="894" height="894" rx="197" fill="none" stroke="#c3d0dc" stroke-opacity=".12" stroke-width="2"/>
+<ellipse cx="522" cy="795" rx="228" ry="25" fill="black" opacity=".8" filter="url(#blur)"/>
+<circle cx="512" cy="480" r="294" fill="url(#sphere)" stroke="url(#rim)" stroke-width="2"/>
+<g clip-path="url(#ball)" fill="none" stroke="#c6d5e3" stroke-width="1.2" opacity=".22">
+  <path d="M182 359H359l42 42v108h91l30 30v164h164M208 376h135l38 38v113h102l22 22v169h199M200 393h128l36 36v116h109l15 15v172h220"/>
+  <path d="M559 175v152l38 38h108l40 40v170h87M578 175v144l28 28h110l48 48v180h64M597 175v135l21 21h106l60 60v205h46"/>
+  <path d="M200 586h90l49 49v153M201 605h81l38 38v146M200 624h72l31 31v136M668 207v60l-26 26h-90v97l-31 31H409M687 207v69l-34 34h-85v91l-32 32H409"/>
+  <circle cx="409" cy="421" r="4"/><circle cx="686" cy="703" r="4"/><circle cx="339" cy="635" r="4"/>
+</g>
+<path d="M265 390a265 265 0 0 1 261-175" fill="none" stroke="#ffffff" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/>
+<g font-family="Menlo,monospace" font-size="43" letter-spacing="8" text-anchor="middle">
+  <text x="516" y="855" fill="#ff352e" filter="url(#red)" opacity=".65">00:00:01</text>
+  <text x="516" y="855" fill="#ee514b">00:00:01</text>
+</g>
+</svg>

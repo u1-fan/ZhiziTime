@@ -1,0 +1,48 @@
+version: '3'
+
+dir: '{{.ROOT_DIR}}'
+
+vars:
+  APP_NAME: ZhiziTime
+  BUILD_DIR: '{{.ROOT_DIR}}/.build/release'
+  APP_DIR: '{{.ROOT_DIR}}/dist/{{.APP_NAME}}.app'
+
+platforms: [darwin]
+
+tasks:
+  default:
+    desc: 显示可用的 macOS 构建任务
+    cmds:
+      - task --list
+
+  check:
+    desc: 检查 Swift 包结构并编译源码，不启动应用
+    cmds:
+      - swift package describe
+      - swift build -c debug
+
+  build:
+    desc: 构建 macOS release 可执行文件，不安装或启动应用
+    cmds:
+      - swift build -c release
+
+  app:
+    desc: 构建可双击运行的 ZhiziTime.app 到 dist，不启动应用
+    deps: [build]
+    cmds:
+      - mkdir -p "{{.APP_DIR}}/Contents/MacOS" "{{.APP_DIR}}/Contents/Resources"
+      - cp "{{.BUILD_DIR}}/{{.APP_NAME}}" "{{.APP_DIR}}/Contents/MacOS/{{.APP_NAME}}"
+      - cp "{{.ROOT_DIR}}/Resources/Info.plist" "{{.APP_DIR}}/Contents/Info.plist"
+      - cp "{{.ROOT_DIR}}/Resources/AppIcon.icns" "{{.APP_DIR}}/Contents/Resources/AppIcon.icns"
+      - chmod +x "{{.APP_DIR}}/Contents/MacOS/{{.APP_NAME}}"
+
+  run:
+    desc: 构建并打开本地浮层应用，不阻塞当前终端
+    deps: [app]
+    cmds:
+      - open "{{.APP_DIR}}"
+
+  clean:
+    desc: 删除本项目生成的 .build 和 dist 产物
+    cmds:
+      - rm -rf "{{.ROOT_DIR}}/.build" "{{.ROOT_DIR}}/dist"
