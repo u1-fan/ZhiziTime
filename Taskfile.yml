@@ -6,14 +6,23 @@ vars:
   APP_NAME: ZhiziTime
   BUILD_DIR: '{{.ROOT_DIR}}/.build/release'
   APP_DIR: '{{.ROOT_DIR}}/dist/{{.APP_NAME}}.app'
+  INSTALL_DIR: '{{.HOME}}/Applications'
 
 platforms: [darwin]
 
 tasks:
   default:
-    desc: 显示可用的 macOS 构建任务
+    desc: 显示可用的 macOS 任务
     cmds:
       - task --list
+
+  doctor:
+    desc: 显示 Swift、Python 和 macOS SDK 路径，不编译或检查发布凭据
+    cmds:
+      - swift --version
+      - python3 --version
+      - xcrun --find swiftc
+      - xcrun --show-sdk-path
 
   check:
     desc: 检查 Swift 包结构并编译源码，不启动应用
@@ -21,28 +30,62 @@ tasks:
       - swift package describe
       - swift build -c debug
 
-  build:
-    desc: 构建 macOS release 可执行文件，不安装或启动应用
+  test:
+    desc: 运行 Swift 渲染回归测试和 macOS 工作流测试，不启动应用
     cmds:
-      - swift build -c release
+      - swift test
+      - task: workflow:test
+
+  build:
+    desc: 构建当前架构的 macOS release 可执行文件，不测试、安装或启动
+    cmds:
+      - swift build -c release --product {{shellQuote .APP_NAME}}
 
   app:
-    desc: 构建可双击运行的 ZhiziTime.app 到 dist，不启动应用
-    deps: [build]
+    desc: 构建并打包本地 .app，使用临时签名并校验，不安装或启动
+    summary: |
+      默认输出 dist/ZhiziTime.app，先在临时目录组装并验证，再替换旧产物。
+      临时签名不访问开发者证书；产物仅用于本机，不包含公证或公开分发校验。
     cmds:
-      - mkdir -p "{{.APP_DIR}}/Contents/MacOS" "{{.APP_DIR}}/Contents/Resources"
-      - cp "{{.BUILD_DIR}}/{{.APP_NAME}}" "{{.APP_DIR}}/Contents/MacOS/{{.APP_NAME}}"
-      - cp "{{.ROOT_DIR}}/Resources/Info.plist" "{{.APP_DIR}}/Contents/Info.plist"
-      - cp "{{.ROOT_DIR}}/Resources/AppIcon.icns" "{{.APP_DIR}}/Contents/Resources/AppIcon.icns"
-      - chmod +x "{{.APP_DIR}}/Contents/MacOS/{{.APP_NAME}}"
+      - task: build
+      - python3 scripts/macos.py package --binary {{shellQuote (printf "%s/%s" .BUILD_DIR .APP_NAME)}} --app {{shellQuote .APP_DIR}}
+
+  verify:
+    desc: 校验已有 .app 的标识、可执行文件、图标和签名，不构建或启动
+    cmds:
+      - python3 scripts/macos.py verify --app {{shellQuote .APP_DIR}}
+
+  install:
+    desc: 安装已有 .app 到 INSTALL_DIR，校验失败保留旧版，不构建或启动
+    summary: |
+      默认安装到 ~/Applications/ZhiziTime.app，不提权。
+      INSTALL_DIR 和 APP_DIR 的相对路径均以仓库根目录为基准。
+      目标应用正在运行时拒绝覆盖；请先通过菜单栏退出。
+    cmds:
+      - python3 scripts/macos.py install --app {{shellQuote .APP_DIR}} --install-dir {{shellQuote .INSTALL_DIR}}
+
+  launch:
+    desc: 打开已有 .app，最多等待 10 秒确认目标路径对应的进程，不构建
+    cmds:
+      - python3 scripts/macos.py launch --app {{shellQuote .APP_DIR}}
 
   run:
-    desc: 构建并打开本地浮层应用，不阻塞当前终端
-    deps: [app]
+    desc: 构建、打包并打开本地浮层应用，最多等待 10 秒确认启动
     cmds:
-      - open "{{.APP_DIR}}"
+      - task: app
+      - task: launch
+
+  logs:
+    desc: 持续查看 ZhiziTime 的系统日志，按 Ctrl-C 退出，不启动应用
+    cmds:
+      - /usr/bin/log stream --style compact --predicate 'process == "ZhiziTime"'
+
+  workflow:test:
+    desc: 用临时目录和替身命令测试工作流，不构建或安装真实应用
+    cmds:
+      - python3 -m unittest discover -s tests -p 'test_*.py'
 
   clean:
     desc: 删除本项目生成的 .build 和 dist 产物
     cmds:
-      - rm -rf "{{.ROOT_DIR}}/.build" "{{.ROOT_DIR}}/dist"
+      - rm -rf .build dist
