@@ -13,6 +13,11 @@ let package = Package(
         .executableTarget(
             name: "ZhiziTime",
             path: "Sources/ZhiziTime"
+        ),
+        .testTarget(
+            name: "ZhiziTimeTests",
+            dependencies: ["ZhiziTime"],
+            path: "tests/ZhiziTimeTests"
         )
     ]
 )

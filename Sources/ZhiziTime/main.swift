@@ -1,13 +1,17 @@
 import AppKit
 import SwiftUI
+import Combine
 
 @main
-struct ZhiziTimeApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-
-    var body: some Scene {
-        Settings {
-            EmptyView()
+struct ZhiziTimeApp {
+    @MainActor
+    static func main() {
+        let application = NSApplication.shared
+        let delegate = AppDelegate()
+        application.delegate = delegate
+        // 菜单栏应用的窗口由代理管理，避免额外生成空白的 SwiftUI 设置窗口。
+        withExtendedLifetime(delegate) {
+            application.run()
         }
     }
 }
@@ -19,16 +23,49 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: NSWindow?
     private let settings = ClockSettings()
     private var isVisible = true
+    private var desktopClock: DesktopClockRenderer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        createMainMenu()
         createPanel()
         createStatusItem()
     }
 
+    private func createMainMenu() {
+        let menu = NSMenu()
+        let appItem = NSMenuItem()
+        let appMenu = NSMenu(title: "智子时间")
+        let settingsItem = NSMenuItem(title: "设置…", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        appMenu.addItem(settingsItem)
+        appMenu.addItem(.separator())
+        let quitItem = NSMenuItem(title: "退出智子时间", action: #selector(quit), keyEquivalent: "q")
+        quitItem.target = self
+        appMenu.addItem(quitItem)
+        appItem.submenu = appMenu
+        menu.addItem(appItem)
+
+        let editItem = NSMenuItem()
+        let editMenu = NSMenu(title: "编辑")
+        for (title, action, key) in [
+            ("撤销", Selector(("undo:")), "z"),
+            ("重做", Selector(("redo:")), "Z"),
+            ("剪切", #selector(NSText.cut(_:)), "x"),
+            ("复制", #selector(NSText.copy(_:)), "c"),
+            ("粘贴", #selector(NSText.paste(_:)), "v"),
+            ("全选", #selector(NSText.selectAll(_:)), "a")
+        ] {
+            editMenu.addItem(NSMenuItem(title: title, action: action, keyEquivalent: key))
+        }
+        editItem.submenu = editMenu
+        menu.addItem(editItem)
+        NSApp.mainMenu = menu
+    }
+
     private func createPanel() {
         panel = ZhiziPanel(
-            contentRect: NSScreen.main?.frame ?? NSRect(x: 0, y: 0, width: 1440, height: 900),
+            contentRect: NSRect(x: 0, y: 0, width: 1, height: 1),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -40,14 +77,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = true
-        panel.contentView = NSHostingView(rootView: ZhiziClockView(settings: settings))
-        positionPanel()
+        desktopClock = DesktopClockRenderer(panel: panel, settings: settings)
         panel.orderFrontRegardless()
-    }
-
-    private func positionPanel() {
-        guard let screen = NSScreen.main else { return }
-        panel.setFrame(screen.frame, display: true)
     }
 
     private func createStatusItem() {
@@ -71,12 +102,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let view = ClockSettingsView(settings: settings)
             let hostingView = NSHostingView(rootView: view)
             let window = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 440, height: 510),
-                styleMask: [.titled, .closable, .miniaturizable],
+                contentRect: NSRect(x: 0, y: 0, width: 1040, height: 760),
+                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
             window.title = "智子时间设置"
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
+            window.backgroundColor = NSColor(red: 0.025, green: 0.045, blue: 0.065, alpha: 1)
+            window.minSize = NSSize(width: 980, height: 720)
             window.contentView = hostingView
             window.isReleasedWhenClosed = false
             window.center()
@@ -88,6 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func togglePanel() {
         isVisible.toggle()
+        desktopClock?.setVisible(isVisible)
         if isVisible {
             panel.orderFrontRegardless()
         } else {
@@ -115,18 +151,25 @@ final class ClockSettings: ObservableObject {
     @Published var format: ClockFormat { didSet { save() } }
     @Published var customFormat: String { didSet { save() } }
     @Published var colorMode: ClockColor { didSet { save() } }
+    @Published var appearance: ConsoleAppearance { didSet { save() } }
+    @Published var fontWeight: ClockWeight { didSet { save() } }
 
-    let fonts = ["系统等宽", "SF Mono", "Menlo", "Helvetica Neue", "Avenir Next", "Courier"]
+    @Published private(set) var fonts: [String]
 
     init() {
+        ClockTypography.restoreImportedFonts()
+        fonts = ["系统等宽"] + NSFontManager.shared.availableFontFamilies.sorted()
         let defaults = UserDefaults.standard
-        fontName = defaults.string(forKey: "fontName") ?? "系统等宽"
+        let storedFontName = defaults.string(forKey: "fontName") ?? "系统等宽"
+        fontName = NSFont(name: storedFontName, size: 42)?.familyName ?? storedFontName
         fontSize = defaults.object(forKey: "fontSize") as? Double ?? 42
         opacity = defaults.object(forKey: "opacity") as? Double ?? 0.48
         position = ClockPosition(rawValue: defaults.string(forKey: "position") ?? "center") ?? .center
         format = ClockFormat(rawValue: defaults.string(forKey: "format") ?? "zh") ?? .chinese
         customFormat = defaults.string(forKey: "customFormat") ?? "yyyy-MM-dd HH:mm:ss"
         colorMode = ClockColor(rawValue: defaults.string(forKey: "colorMode") ?? "adaptive") ?? .adaptive
+        appearance = ConsoleAppearance(rawValue: defaults.string(forKey: "appearance") ?? "night") ?? .night
+        fontWeight = ClockWeight(rawValue: defaults.string(forKey: "fontWeight") ?? "light") ?? .light
     }
 
     func reset() {
@@ -137,6 +180,13 @@ final class ClockSettings: ObservableObject {
         format = .chinese
         customFormat = "yyyy-MM-dd HH:mm:ss"
         colorMode = .adaptive
+        appearance = .night
+        fontWeight = .light
+    }
+
+    func importFont(from url: URL) throws {
+        fontName = try ClockTypography.importFont(from: url)
+        fonts = ["系统等宽"] + Array(Set([fontName] + NSFontManager.shared.availableFontFamilies)).sorted()
     }
 
     private func save() {
@@ -148,6 +198,8 @@ final class ClockSettings: ObservableObject {
         defaults.set(format.rawValue, forKey: "format")
         defaults.set(customFormat, forKey: "customFormat")
         defaults.set(colorMode.rawValue, forKey: "colorMode")
+        defaults.set(appearance.rawValue, forKey: "appearance")
+        defaults.set(fontWeight.rawValue, forKey: "fontWeight")
     }
 }
 
@@ -162,7 +214,7 @@ enum ClockColor: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .adaptive: return "自动适配背景"
+        case .adaptive: return "背景反相"
         case .white: return "白色"
         case .black: return "黑色"
         case .orange: return "橙色"
@@ -239,15 +291,20 @@ enum ClockFormat: String, CaseIterable, Identifiable {
 
 struct ZhiziClockView: View {
     @ObservedObject var settings: ClockSettings
+    var isPreview = false
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            Text(formattedDate(context.date))
-                .font(selectedFont)
-                .monospacedDigit()
-                .foregroundStyle(settings.colorMode.color.opacity(settings.opacity))
-                .blendMode(settings.colorMode == .adaptive ? .difference : .normal)
-                .tracking(2)
+            Group {
+                if isPreview {
+                    clockText(context.date)
+                        .blendMode(settings.colorMode == .adaptive ? .difference : .normal)
+                } else {
+                    // 桌面文字保留原生图层，避免 SwiftUI 混合效果将背景合成栅格化。
+                    clockText(context.date)
+                }
+            }
+                .fixedSize()
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: settings.position.alignment)
                 .padding(48)
                 .allowsHitTesting(false)
@@ -256,102 +313,23 @@ struct ZhiziClockView: View {
         .ignoresSafeArea()
     }
 
-    private var selectedFont: Font {
-        if settings.fontName == "系统等宽" {
-            return .system(size: settings.fontSize, weight: .light, design: .monospaced)
-        }
-        return .custom(settings.fontName, size: settings.fontSize)
+    private func clockText(_ date: Date) -> ClockText {
+        ClockText(
+            text: formattedDate(date),
+            font: ClockTypography.font(name: settings.fontName, size: settings.fontSize, weight: settings.fontWeight),
+            color: settings.colorMode,
+            opacity: settings.opacity,
+            invertsDesktop: !isPreview
+        )
     }
 
     private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = settings.format == .custom
-            ? normalizedCustomFormat(settings.customFormat)
+            ? ClockDateFormat.normalize(settings.customFormat)
             : settings.format.dateFormat
         return formatter.string(from: date)
     }
 
-    private func normalizedCustomFormat(_ value: String) -> String {
-        guard value.contains("Y") || value.contains("i") else {
-            return value
-        }
-        return value
-            .replacingOccurrences(of: "Y", with: "yyyy")
-            .replacingOccurrences(of: "m", with: "MM")
-            .replacingOccurrences(of: "d", with: "dd")
-            .replacingOccurrences(of: "H", with: "HH")
-            .replacingOccurrences(of: "i", with: "mm")
-            .replacingOccurrences(of: "s", with: "ss")
-    }
-}
-
-struct ClockSettingsView: View {
-    @ObservedObject var settings: ClockSettings
-
-    var body: some View {
-        Form {
-            Section("显示样式") {
-                Picker("字体", selection: $settings.fontName) {
-                    ForEach(settings.fonts, id: \.self) { font in
-                        Text(font).tag(font)
-                    }
-                }
-
-                Picker("字体颜色", selection: $settings.colorMode) {
-                    ForEach(ClockColor.allCases) { color in
-                        Text(color.title).tag(color)
-                    }
-                }
-
-                HStack {
-                    Text("大小")
-                    Slider(value: $settings.fontSize, in: 16...120, step: 1)
-                    Text("\(Int(settings.fontSize))")
-                        .monospacedDigit()
-                        .frame(width: 36, alignment: .trailing)
-                }
-
-                HStack {
-                    Text("亮度")
-                    Slider(value: $settings.opacity, in: 0.05...1.0, step: 0.01)
-                    Text("\(Int(settings.opacity * 100))%")
-                        .monospacedDigit()
-                        .frame(width: 42, alignment: .trailing)
-                }
-
-                Picker("位置", selection: $settings.position) {
-                    ForEach(ClockPosition.allCases) { position in
-                        Text(position.title).tag(position)
-                    }
-                }
-            }
-
-            Section("时间格式") {
-                Picker("格式", selection: $settings.format) {
-                    ForEach(ClockFormat.allCases) { format in
-                        Text(format.title).tag(format)
-                    }
-                }
-
-                if settings.format == .custom {
-                    TextField("例如 Y-m-d H:i:s", text: $settings.customFormat)
-                        .textFieldStyle(.roundedBorder)
-                    Text("支持：Y 年、m 月、d 日、H 时、i 分、s 秒；也可直接使用 yyyy-MM-dd。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            HStack {
-                Spacer()
-                Button("恢复默认") {
-                    settings.reset()
-                }
-            }
-        }
-        .formStyle(.grouped)
-        .padding(.vertical, 8)
-        .frame(width: 440, height: 510)
-    }
 }
