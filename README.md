@@ -4,6 +4,16 @@
 
 应用启动后默认在主屏幕居中显示日期和时间。浮层使用跨 Space 的置顶面板，因此切换桌面或进入全屏应用时仍会显示；应用本身以菜单栏图标运行，不会在 Dock 中占位。
 
+## 截图
+
+桌面悬浮时钟：
+
+![桌面悬浮时钟](docs/images/zhizitime-clock.png)
+
+设置界面：
+
+![智子时间设置界面](docs/images/zhizitime-settings.png)
+
 ## 开源发布
 
 本项目使用 [MIT License](LICENSE) 发布。你可以免费使用、复制、修改、合并、发布、再许可或销售本项目的副本，但需要在副本中保留版权声明和许可证文本。
@@ -11,6 +21,19 @@
 欢迎提交 Issue 和 Pull Request。项目当前没有外部依赖；可以按下文的构建步骤在本机编译和打包。
 
 当前仓库提供的是本地构建工作流，不包含开发者证书签名、公证、App Store 上传或自动更新发布流程。桌面反相功能依赖非公开的 macOS 系统合成接口，系统升级后可能需要适配。
+
+## 安装
+
+### 下载 Release
+
+从 [Releases](https://github.com/u1-fan/ZhiziTime/releases) 下载最新版本。目前提供 Apple Silicon（`arm64`）构建包：
+
+1. 下载 `ZhiziTime-v1.0.0-macos-arm64.zip` 并解压。
+2. 将 `ZhiziTime.app` 移动到 `~/Applications` 或 `/Applications`。
+3. 首次打开时，如果 macOS 提示无法验证开发者，请在 Finder 中右键应用，选择“打开”，再确认打开。
+4. 应用启动后会出现在菜单栏，并在桌面显示时间；通过菜单栏的“设置…”调整字体、颜色、位置和时间格式。
+
+当前 Release 使用本地临时签名，不包含 Developer ID 公证。Intel Mac 可以按下方的源码构建步骤在本机编译。
 
 ## 运行要求
 
