@@ -18,22 +18,23 @@
 
 本项目使用 [MIT License](LICENSE) 发布。你可以免费使用、复制、修改、合并、发布、再许可或销售本项目的副本，但需要在副本中保留版权声明和许可证文本。
 
-欢迎提交 Issue 和 Pull Request。项目当前没有外部依赖；可以按下文的构建步骤在本机编译和打包。
+欢迎提交 Issue 和 Pull Request。项目通过 Swift Package Manager 使用 Sparkle 2；首次构建需要下载依赖。
 
-当前仓库提供的是本地构建工作流，不包含开发者证书签名、公证、App Store 上传或自动更新发布流程。桌面反相功能依赖非公开的 macOS 系统合成接口，系统升级后可能需要适配。
+仓库同时提供本地 DMG 打包、Sparkle 更新入口和 GitHub Actions Release DMG workflow。Developer ID 签名、公证和 Sparkle appcast 需要配置 Apple 证书、App Store Connect API key 与 EdDSA 私钥。桌面反相功能依赖非公开的 macOS 系统合成接口，系统升级后可能需要适配。
 
 ## 安装
 
 ### 下载 Release
 
-从 [Releases](https://github.com/u1-fan/ZhiziTime/releases) 下载最新版本。目前提供 Apple Silicon（`arm64`）构建包：
+从 [Releases](https://github.com/u1-fan/ZhiziTime/releases) 下载最新版本。Release workflow 为 Apple Silicon（`arm64`）和 Intel（`x86_64`）生成 DMG：
 
-1. 下载 `ZhiziTime-v1.0.0-macos-arm64.zip` 并解压。
-2. 将 `ZhiziTime.app` 移动到 `~/Applications` 或 `/Applications`。
+1. 下载对应架构的 `ZhiziTime-v1.0.0-macOS-<arch>.dmg`。
+2. 打开 DMG，将 `ZhiziTime.app` 拖到 `Applications`。
 3. 首次打开时，如果 macOS 提示无法验证开发者，请在 Finder 中右键应用，选择“打开”，再确认打开。
-4. 应用启动后会出现在菜单栏，并在桌面显示时间；通过菜单栏的“设置…”调整字体、颜色、位置和时间格式。
+4. 已配置 Sparkle 的稳定公证版本会在菜单栏提供“检查更新…”。
+5. 应用启动后会出现在菜单栏，并在桌面显示时间；通过菜单栏的“设置…”调整字体、颜色、位置和时间格式。
 
-当前 Release 使用本地临时签名，不包含 Developer ID 公证。Intel Mac 可以按下方的源码构建步骤在本机编译。
+未配置 Developer ID 时，workflow 仍可生成未公证 DMG；macOS 可能要求用户在“系统设置 → 隐私与安全性”中允许首次打开。
 
 ## 运行要求
 
@@ -51,6 +52,9 @@ task macos:check         # 检查包结构并编译 debug 版本
 task macos:test          # 运行 Swift 渲染回归测试和 macOS 工作流测试
 task macos:build         # 只构建当前架构的 release 可执行文件
 task macos:app           # 构建并打包 dist/ZhiziTime.app，使用临时签名并校验
+task macos:dmg           # 构建版本化 DMG，并嵌入 Sparkle.framework
+task release:prepare     # 更新 VERSION、README 和 CHANGELOG
+task release-check       # 校验版本、Sparkle 和 Release workflow 元数据
 task macos:verify        # 校验已有 .app，不构建或启动
 task macos:install       # 将已有 .app 安装到 ~/Applications，不构建或启动
 task macos:launch        # 打开已有 .app，最多等待 10 秒确认对应路径的进程
@@ -62,9 +66,9 @@ task macos:clean         # 删除仓库内的 .build 和 dist
 
 所有任务仅在 macOS 上执行。从仓库子目录调用时，工作目录仍固定在仓库根目录。
 `check`、`build` 和 `app` 不启动或停止应用，也不运行测试。`test` 按顺序运行 Swift 测试和工作流测试；也可以用 `swift test` 单独运行 Swift 测试。
-当前包没有外部依赖；以后添加依赖后，SwiftPM 构建可能需要下载依赖。
+SwiftPM release 配置启用 `ZHIZI_ENABLE_SPARKLE`，debug 构建不会启动更新器。`macos:app` 会在本地存在 SwiftPM Sparkle artifacts 时嵌入框架；`macos:dmg` 使用发布脚本组装 DMG、签名嵌套代码并生成 SHA-256。
 
-`app` 在临时目录中组装应用，使用 `codesign --sign -` 添加临时签名，不使用开发者证书，再检查 Bundle ID、可执行文件、图标和签名。校验通过后才替换旧产物。产物只包含当前构建架构，供本机使用；不包含 Developer ID 签名、公证、上传或自动更新发布流程。
+`app` 在临时目录中组装应用，使用临时签名，再检查 Bundle ID、版本、可执行文件、图标、Sparkle 嵌入和签名。校验通过后才替换旧产物。产物只包含当前构建架构，供本机使用。
 
 `install` 先校验已有产物，再复制到目标目录中的临时位置。复制或验签失败不会覆盖旧应用；替换后再次校验，失败则恢复旧应用。目标应用正在运行时拒绝替换，请先从菜单栏退出。打包也会拒绝替换正在运行的目标 `.app`。
 
@@ -87,6 +91,42 @@ swift build -c release --product ZhiziTime
 python3 scripts/macos.py package --binary .build/release/ZhiziTime --app dist/ZhiziTime.app
 python3 scripts/macos.py launch --app dist/ZhiziTime.app
 ```
+
+### Sparkle 配置
+
+`Sources/ZhiziTime/Resources/VERSION` 是版本唯一来源。发布前运行：
+
+```bash
+task release:prepare -- 1.1.0
+task release-check
+```
+
+要启用稳定版本自动更新，需要用 Sparkle 的 `generate_keys` 创建 EdDSA 密钥，将公钥保存为 `config/sparkle-public-key.txt`，将私钥保存为 GitHub Secret `SPARKLE_EDDSA_PRIVATE_KEY`。私钥不能提交到仓库。
+
+也可以使用快捷命令：
+
+```bash
+task sparkle:keys                  # 从钥匙串初始化或刷新公钥文件
+task sparkle:keys:check            # 检查公钥文件与钥匙串是否一致
+task sparkle:keys:export-private -- "$TMPDIR/sparkle-private-key.txt"
+```
+
+私钥导出后只用于写入 GitHub Secret `SPARKLE_EDDSA_PRIVATE_KEY`，确认上传成功后立即删除导出文件。
+
+GitHub Actions 还需要配置以下 Secrets 才能生成签名、公证 DMG 和 appcast：
+
+- `DEVELOPER_ID_CERTIFICATE_BASE64`
+- `DEVELOPER_ID_CERTIFICATE_PASSWORD`
+- `APPLE_API_KEY_P8_BASE64`
+- `APPLE_API_KEY_ID`
+- `APPLE_API_ISSUER_ID`
+- `SPARKLE_EDDSA_PRIVATE_KEY`（稳定版本必需）
+
+从 GitHub Actions 的 **Release DMG** workflow 手动输入版本号和 prerelease 标志。稳定版本先执行检查、Developer ID 签名、公证、staple 和 appcast 生成，再发布为 latest；未公证版本和 prerelease 不进入生产 appcast。
+
+发布完成后 workflow 会轮询两个公开 appcast，确认当前版本和对应架构 DMG 已经可下载；如果 GitHub 内容分发尚未更新，workflow 会等待并重试，超时则失败。
+
+每次 push 或 Pull Request 还会运行 `CI` workflow，检查 GitHub Actions、Python 脚本和 Shell 脚本。
 
 菜单栏中的时钟图标提供“设置…”“隐藏时间”“显示时间”和“退出”操作。应用默认在主屏幕居中显示时间，浮层不接收鼠标事件，因此不会挡住桌面上的正常操作。
 

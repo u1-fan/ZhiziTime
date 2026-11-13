@@ -1,0 +1,269 @@
+name: Release DMG
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version to release, for example 1.0.0
+        required: true
+        type: string
+      prerelease:
+        description: Publish as a prerelease
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      source_sha: ${{ steps.plan.outputs.source_sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Validate release request
+        id: plan
+        env:
+          VERSION_INPUT: ${{ inputs.version }}
+          PRERELEASE_INPUT: ${{ inputs.prerelease }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          plan_json="$(python3 scripts/plan_release.py "$VERSION_INPUT" --prerelease "$PRERELEASE_INPUT")"
+          python3 - "$plan_json" "$GITHUB_OUTPUT" <<'PY'
+          import json, pathlib, sys
+          values = json.loads(sys.argv[1])
+          output = pathlib.Path(sys.argv[2])
+          with output.open("a", encoding="utf-8") as stream:
+              for key in ("version", "tag", "source_sha"):
+                  print(f"{key}={values[key]}", file=stream)
+          PY
+
+  build:
+    needs: plan
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            runner: macos-26
+          - arch: x86_64
+            runner: macos-26-intel
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      EXPECTED_ARCH: ${{ matrix.arch }}
+      DMG_NAME: ZhiziTime-v${{ needs.plan.outputs.version }}-macOS-${{ matrix.arch }}.dmg
+      FEED_NAME: ${{ matrix.arch == 'arm64' && 'appcast.xml' || 'appcast-x86_64.xml' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.source_sha }}
+          fetch-depth: 0
+
+      - name: Validate architecture and tools
+        run: |
+          set -euo pipefail
+          [[ "$(uname -m)" == "$EXPECTED_ARCH" ]]
+          for tool in swift codesign hdiutil xcrun; do command -v "$tool" >/dev/null; done
+
+      - name: Validate signing and notarization secrets
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          values=("$CERTIFICATE_BASE64" "$CERTIFICATE_PASSWORD" "$API_KEY_BASE64" "$API_KEY_ID" "$API_ISSUER_ID")
+          configured=0
+          for value in "${values[@]}"; do [[ -n "$value" ]] && configured=$((configured + 1)); done
+          if [[ "$configured" -eq 0 ]]; then
+            echo "RELEASE_MODE=unnotarized" >> "$GITHUB_ENV"
+            echo "ZHIZI_SIGNING_IDENTITY=-" >> "$GITHUB_ENV"
+          elif [[ "$configured" -ne "${#values[@]}" ]]; then
+            echo "Signing/notarization secrets are only partially configured." >&2
+            exit 1
+          else
+            echo "RELEASE_MODE=notarized" >> "$GITHUB_ENV"
+          fi
+          if [[ "$PRERELEASE" == false && "$configured" -eq "${#values[@]}" ]]; then
+            [[ -n "$SPARKLE_PRIVATE_KEY" ]] || { echo "SPARKLE_EDDSA_PRIVATE_KEY is required for stable Sparkle releases" >&2; exit 1; }
+            [[ -s config/sparkle-public-key.txt ]] || { echo "config/sparkle-public-key.txt is required for stable Sparkle releases" >&2; exit 1; }
+          fi
+
+      - name: Import Developer ID certificate
+        if: env.RELEASE_MODE == 'notarized'
+        env:
+          CERTIFICATE_BASE64: ${{ secrets.DEVELOPER_ID_CERTIFICATE_BASE64 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          certificate_path="$RUNNER_TEMP/developer-id.p12"
+          keychain_path="$RUNNER_TEMP/release-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          printf '%s' "$CERTIFICATE_BASE64" | base64 --decode -o "$certificate_path"
+          security create-keychain -p "$keychain_password" "$keychain_path"
+          security set-keychain-settings -lut 21600 "$keychain_path"
+          security unlock-keychain -p "$keychain_password" "$keychain_path"
+          security import "$certificate_path" -P "$CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$keychain_path"
+          security set-key-partition-list -S apple-tool:,apple: -k "$keychain_password" "$keychain_path"
+          security list-keychains -d user -s "$keychain_path"
+          identity="$(security find-identity -v -p codesigning "$keychain_path" | sed -n 's/.*"\(Developer ID Application:[^"]*\)"/\1/p' | head -n 1)"
+          [[ -n "$identity" ]]
+          echo "ZHIZI_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Run checks
+        run: |
+          set -euo pipefail
+          swift test
+          python3 -m unittest discover -s tests -p 'test_*.py'
+          python3 scripts/release_check.py "$TAG"
+
+      - name: Build and package DMG
+        run: bash scripts/package_dmg.sh "$VERSION"
+
+      - name: Notarize and staple DMG
+        if: env.RELEASE_MODE == 'notarized'
+        env:
+          API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_P8_BASE64 }}
+          API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          dmg_path="dist/$DMG_NAME"
+          api_key_path="$RUNNER_TEMP/AuthKey_${API_KEY_ID}.p8"
+          result_path="$RUNNER_TEMP/notarization-result.json"
+          printf '%s' "$API_KEY_BASE64" | base64 --decode -o "$api_key_path"
+          xcrun notarytool submit "$dmg_path" --key "$api_key_path" --key-id "$API_KEY_ID" --issuer "$API_ISSUER_ID" --wait --output-format json > "$result_path"
+          cat "$result_path"
+          status="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["status"])' "$result_path")"
+          if [[ "$status" != Accepted ]]; then
+            submission_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$result_path")"
+            xcrun notarytool log "$submission_id" --key "$api_key_path" --key-id "$API_KEY_ID" --issuer "$API_ISSUER_ID" || true
+            exit 1
+          fi
+          xcrun stapler staple "$dmg_path"
+          xcrun stapler validate "$dmg_path"
+          spctl --assess --type open --context context:primary-signature --verbose=4 "$dmg_path"
+
+      - name: Generate signed Sparkle appcast
+        if: env.RELEASE_MODE == 'notarized' && inputs.prerelease == false
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_EDDSA_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          feed_dir="$RUNNER_TEMP/sparkle-feed"
+          mkdir -p "$feed_dir"
+          cp "dist/$DMG_NAME" "$feed_dir/$DMG_NAME"
+          feed_url="https://github.com/u1-fan/ZhiziTime/releases/latest/download/$FEED_NAME"
+          http_status="$(curl --location --silent --show-error --output "$feed_dir/$FEED_NAME" --write-out '%{http_code}' "$feed_url")"
+          if [[ "$http_status" == 404 ]]; then
+            rm -f "$feed_dir/$FEED_NAME"
+          elif [[ "$http_status" != 200 ]]; then
+            echo "Cannot read existing Sparkle feed: HTTP $http_status" >&2
+            exit 1
+          fi
+          appcast_tool="$(find .build/artifacts -type f -path '*/Sparkle/bin/generate_appcast' -print -quit)"
+          [[ -x "$appcast_tool" ]]
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | "$appcast_tool" --ed-key-file - --maximum-deltas 0 \
+            --download-url-prefix "https://github.com/u1-fan/ZhiziTime/releases/download/$TAG/" "$feed_dir"
+          python3 scripts/verify_appcast.py "$feed_dir/$FEED_NAME" "$VERSION" "$DMG_NAME"
+          cp "$feed_dir/$FEED_NAME" "dist/$FEED_NAME"
+
+      - name: Verify DMG and checksum
+        run: |
+          set -euo pipefail
+          hdiutil verify "dist/$DMG_NAME"
+          (cd dist && shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256")
+          (cd dist && shasum -a 256 -c "$DMG_NAME.sha256")
+
+      - name: Stage release artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          cp "dist/$DMG_NAME" "dist/$DMG_NAME.sha256" release-assets/
+          if [[ "$RELEASE_MODE" == notarized && "${{ inputs.prerelease }}" == false ]]; then cp "dist/$FEED_NAME" release-assets/; fi
+          echo "$RELEASE_MODE" > "release-assets/signing-mode-$EXPECTED_ARCH.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.arch }}
+          path: release-assets/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.plan.outputs.version }}
+      TAG: ${{ needs.plan.outputs.tag }}
+      SOURCE_SHA: ${{ needs.plan.outputs.source_sha }}
+      PRERELEASE: ${{ inputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.source_sha }}
+          fetch-depth: 1
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify complete artifact set
+        run: |
+          set -euo pipefail
+          release_mode=""
+          for arch in arm64 x86_64; do
+            mode="$(cat "release-assets/signing-mode-$arch.txt")"
+            [[ -z "$release_mode" || "$release_mode" == "$mode" ]]
+            release_mode="$mode"
+            dmg_name="ZhiziTime-v${VERSION}-macOS-${arch}.dmg"
+            (cd release-assets && shasum -a 256 -c "$dmg_name.sha256")
+          done
+          echo "RELEASE_MODE=$release_mode" >> "$GITHUB_ENV"
+      - name: Create draft GitHub Release
+        run: |
+          set -euo pipefail
+          notes="ZhiziTime v${VERSION} for Apple Silicon and Intel Macs running macOS 13 or later."
+          if [[ "$RELEASE_MODE" == notarized ]]; then notes+=$'\n\nSigned with Developer ID Application and notarized by Apple.'; else notes+=$'\n\nThis build is not notarized; macOS may require approval before first launch.'; fi
+          assets=(
+            "release-assets/ZhiziTime-v${VERSION}-macOS-arm64.dmg"
+            "release-assets/ZhiziTime-v${VERSION}-macOS-arm64.dmg.sha256"
+            "release-assets/ZhiziTime-v${VERSION}-macOS-x86_64.dmg"
+            "release-assets/ZhiziTime-v${VERSION}-macOS-x86_64.dmg.sha256"
+          )
+          gh release create "$TAG" "${assets[@]}" --target "$SOURCE_SHA" --draft --title "ZhiziTime $TAG" --notes "$notes"
+          if [[ "$RELEASE_MODE" == notarized && "$PRERELEASE" == false ]]; then
+            gh release upload "$TAG" release-assets/appcast.xml release-assets/appcast-x86_64.xml
+            gh release edit "$TAG" --draft=false --latest=true
+          else
+            gh release edit "$TAG" --draft=false --latest=false
+          fi
+      - name: Verify published Sparkle appcasts
+        if: env.RELEASE_MODE == 'notarized' && env.PRERELEASE == 'false'
+        run: |
+          set -euo pipefail
+          python3 scripts/verify_published_appcast.py \
+            "https://github.com/u1-fan/ZhiziTime/releases/latest/download/appcast.xml" \
+            "$VERSION" "ZhiziTime-v${VERSION}-macOS-arm64.dmg"
+          python3 scripts/verify_published_appcast.py \
+            "https://github.com/u1-fan/ZhiziTime/releases/latest/download/appcast-x86_64.xml" \
+            "$VERSION" "ZhiziTime-v${VERSION}-macOS-x86_64.dmg"

@@ -17,10 +17,18 @@
     <key>CFBundleShortVersionString</key>
     <string>1.0.0</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>1.0.0</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>LSUIElement</key>
     <true/>
+    <key>SUFeedURL</key>
+    <string>https://github.com/u1-fan/ZhiziTime/releases/latest/download/appcast.xml</string>
+    <key>SUPublicEDKey</key>
+    <string>IzwHHeExBrzqcVmNfxkhVMPQA02uM5vApzkIFHgw+sM=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <false/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
 </dict>
 </plist>

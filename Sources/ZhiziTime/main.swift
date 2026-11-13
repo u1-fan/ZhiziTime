@@ -22,11 +22,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var settingsWindow: NSWindow?
     private let settings = ClockSettings()
+    private var updater: AppUpdater!
     private var isVisible = true
     private var desktopClock: DesktopClockRenderer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        updater = AppUpdater()
         createMainMenu()
         createPanel()
         createStatusItem()
@@ -39,6 +41,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let settingsItem = NSMenuItem(title: "设置…", action: #selector(openSettings), keyEquivalent: ",")
         settingsItem.target = self
         appMenu.addItem(settingsItem)
+        let updateItem = NSMenuItem(title: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
+        updateItem.target = self
+        updateItem.isEnabled = updater.isAvailable
+        appMenu.addItem(updateItem)
         appMenu.addItem(.separator())
         let quitItem = NSMenuItem(title: "退出智子时间", action: #selector(quit), keyEquivalent: "q")
         quitItem.target = self
@@ -88,12 +94,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         menu.addItem(NSMenuItem(title: "设置…", action: #selector(openSettings), keyEquivalent: ","))
+        let updateItem = NSMenuItem(title: "检查更新…", action: #selector(checkForUpdates), keyEquivalent: "")
+        updateItem.isEnabled = updater.isAvailable
+        menu.addItem(updateItem)
         menu.addItem(NSMenuItem(title: "隐藏时间", action: #selector(togglePanel), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "退出", action: #selector(quit), keyEquivalent: "q"))
         menu.items[0].target = self
         menu.items[1].target = self
-        menu.items[3].target = self
+        menu.items[2].target = self
+        menu.items[4].target = self
         statusItem.menu = menu
     }
 
@@ -121,6 +131,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         settingsWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates()
     }
 
     @objc private func togglePanel() {

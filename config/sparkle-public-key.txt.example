@@ -1,0 +1,3 @@
+# Generate once with Sparkle's generate_keys tool, then save only the public
+# base64 key in config/sparkle-public-key.txt. Keep the private key in the
+# SPARKLE_EDDSA_PRIVATE_KEY GitHub Secret.

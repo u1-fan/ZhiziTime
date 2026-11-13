@@ -17,11 +17,12 @@ tasks:
       - task --list
 
   macos:doctor:
-    desc: 显示 Swift、Python 和 macOS SDK 路径，不编译或检查发布凭据
+    desc: 显示 Swift、Python、Sparkle 和 macOS SDK 工具路径
     cmds:
       - swift --version
       - python3 --version
       - xcrun --find swiftc
+      - xcrun --find notarytool
       - xcrun --show-sdk-path
 
   macos:check:
@@ -49,6 +50,36 @@ tasks:
     cmds:
       - task: macos:build
       - python3 scripts/macos.py package --binary {{shellQuote (printf "%s/%s" .BUILD_DIR .APP_NAME)}} --app {{shellQuote .APP_DIR}}
+
+  macos:dmg:
+    desc: 构建、签名并创建版本化 Release DMG
+    cmds:
+      - bash scripts/package_dmg.sh {{.CLI_ARGS}}
+
+  release:prepare:
+    desc: 更新 VERSION、README 和 CHANGELOG，准备下一次发布
+    cmds:
+      - python3 scripts/prepare_release.py {{.CLI_ARGS}}
+
+  release-check:
+    desc: 校验版本、Sparkle 和 Release workflow 元数据
+    cmds:
+      - python3 scripts/release_check.py {{.CLI_ARGS}}
+
+  sparkle:keys:
+    desc: 从 macOS 钥匙串初始化并写入 Sparkle 公钥
+    cmds:
+      - bash scripts/configure_sparkle_keys.sh setup
+
+  sparkle:keys:check:
+    desc: 校验仓库中的 Sparkle 公钥与 macOS 钥匙串一致
+    cmds:
+      - bash scripts/configure_sparkle_keys.sh check
+
+  sparkle:keys:export-private:
+    desc: 显式导出 Sparkle 私钥，供手动写入 GitHub Secret
+    cmds:
+      - bash scripts/configure_sparkle_keys.sh export-private {{.CLI_ARGS}}
 
   macos:verify:
     desc: 校验已有 .app 的标识、可执行文件、图标和签名，不构建或启动

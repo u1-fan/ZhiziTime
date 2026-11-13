@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 import plistlib
+import platform
 import shutil
 import subprocess
 import sys
@@ -16,6 +17,8 @@ import time
 ROOT = Path(__file__).resolve().parent.parent
 APP_NAME = "ZhiziTime"
 BUNDLE_ID = "com.brian.zhizitime"
+VERSION_FILE = ROOT / "Sources" / APP_NAME / "Resources" / "VERSION"
+PUBLIC_KEY_FILE = ROOT / "config" / "sparkle-public-key.txt"
 
 
 def run(*args, **kwargs):
@@ -36,6 +39,14 @@ def bundle_path(value):
 
 def executable(app):
     return app / "Contents" / "MacOS" / APP_NAME
+
+
+def sparkle_framework():
+    artifacts = ROOT / ".build" / "artifacts"
+    for candidate in artifacts.glob("**/Sparkle.xcframework/*/Sparkle.framework"):
+        if candidate.is_dir():
+            return candidate
+    return None
 
 
 def verify(app):
@@ -123,9 +134,26 @@ def package(binary, app):
         resources.mkdir()
         shutil.copy2(binary, macos / APP_NAME)
         executable(staged).chmod(0o755)
-        shutil.copy2(ROOT / "Resources" / "Info.plist", staged / "Contents" / "Info.plist")
+        info_path = staged / "Contents" / "Info.plist"
+        with (ROOT / "Resources" / "Info.plist").open("rb") as stream:
+            info = plistlib.load(stream)
+        if VERSION_FILE.is_file():
+            version = VERSION_FILE.read_text(encoding="utf-8").strip()
+            info["CFBundleShortVersionString"] = version
+            info["CFBundleVersion"] = version
+        feed_name = "appcast-x86_64.xml" if platform.machine() == "x86_64" else "appcast.xml"
+        info["SUFeedURL"] = f"https://github.com/u1-fan/ZhiziTime/releases/latest/download/{feed_name}"
+        if PUBLIC_KEY_FILE.is_file() and PUBLIC_KEY_FILE.read_text(encoding="utf-8").strip():
+            info["SUPublicEDKey"] = "".join(PUBLIC_KEY_FILE.read_text(encoding="utf-8").split())
+        with info_path.open("wb") as stream:
+            plistlib.dump(info, stream, sort_keys=False)
         shutil.copy2(ROOT / "Resources" / "AppIcon.icns", resources / "AppIcon.icns")
-        run("codesign", "--force", "--sign", "-", str(staged))
+        framework = sparkle_framework()
+        if framework is not None:
+            frameworks = staged / "Contents" / "Frameworks"
+            frameworks.mkdir(parents=True)
+            shutil.copytree(framework, frameworks / "Sparkle.framework", symlinks=True)
+        run(str(ROOT / "scripts" / "sign_macos_app.sh"), str(staged), "-")
         verify(staged)
         replace_bundle(staged, app, work)
     print(f"已打包并校验：{app}")

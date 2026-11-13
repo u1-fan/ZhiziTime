@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install actionlint
+        run: |
+          set -euo pipefail
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Check GitHub Actions workflows
+        run: actionlint
+
+      - name: Check Python scripts
+        run: |
+          python3 -m py_compile scripts/*.py
+          python3 scripts/release_check.py
+          python3 -m unittest discover -s tests -p 'test_*.py'
+
+      - name: Check shell scripts
+        run: |
+          bash -n scripts/*.sh
+          shellcheck scripts/*.sh

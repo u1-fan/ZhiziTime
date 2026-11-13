@@ -6,3 +6,5 @@ dist/
 *.tgz
 __pycache__/
 .agents/
+config/sparkle-private-key.txt
+.env.local
