@@ -73,6 +73,11 @@ jobs:
           ref: ${{ needs.plan.outputs.source_sha }}
           fetch-depth: 0
 
+      - name: Install Task
+        run: |
+          set -euo pipefail
+          brew list go-task >/dev/null 2>&1 || brew install go-task
+
       - name: Validate architecture and tools
         run: |
           set -euo pipefail
