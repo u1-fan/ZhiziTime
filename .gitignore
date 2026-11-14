@@ -8,3 +8,6 @@ __pycache__/
 .agents/
 config/sparkle-private-key.txt
 .env.local
+# The website release is intentionally committed as static assets.
+!website/dist/
+!website/dist/**

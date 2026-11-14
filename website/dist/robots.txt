@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://zhizi-time.u1.fan/sitemap.xml
