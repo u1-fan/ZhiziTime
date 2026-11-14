@@ -140,3 +140,8 @@ GitHub Actions 还需要配置以下 Secrets 才能生成签名、公证 DMG 和
 - 透明浮层由 AppKit `NSPanel` 和原生文字视图渲染，SwiftUI 负责设置界面和桌面预览。
 - `.canJoinAllSpaces` 和 `.fullScreenAuxiliary` 让浮层跨桌面和全屏空间显示。
 - 菜单栏应用通过 `LSUIElement` 隐藏 Dock 图标。
+
+
+## 官网
+
+项目官网：[zhizi-time.u1.fan](https://zhizi-time.u1.fan/)。官网源码和静态照片位于 [`website/`](website/)，时间码以 `YYYY-MM-DD HH:MM:SS` 叠加在照片中央；发布下载入口见 [GitHub Releases](https://github.com/u1-fan/ZhiziTime/releases)。
