@@ -16,7 +16,9 @@ def verify_document(document: bytes, version: str, artifact: str) -> None:
         enclosure = item.find("enclosure")
         if enclosure is None:
             continue
-        if enclosure.get(f"{{{SPARKLE}}}version") != version:
+        version_element = item.find(f"{{{SPARKLE}}}version")
+        item_version = version_element.text if version_element is not None else enclosure.get(f"{{{SPARKLE}}}version")
+        if item_version != version:
             continue
         url = enclosure.get("url", "")
         if not url or "/latest/" in url or not url.endswith(urllib.parse.quote(artifact)):
