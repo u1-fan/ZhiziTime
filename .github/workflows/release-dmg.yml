@@ -255,7 +255,9 @@ jobs:
             "release-assets/ZhiziTime-v${VERSION}-macOS-x86_64.dmg"
             "release-assets/ZhiziTime-v${VERSION}-macOS-x86_64.dmg.sha256"
           )
-          gh release create "$TAG" "${assets[@]}" --target "$SOURCE_SHA" --draft --title "ZhiziTime $TAG" --notes "$notes"
+          release_flags=(--target "$SOURCE_SHA" --draft --title "ZhiziTime $TAG" --notes "$notes")
+          if [[ "$PRERELEASE" == true ]]; then release_flags+=(--prerelease); fi
+          gh release create "$TAG" "${assets[@]}" "${release_flags[@]}"
           if [[ "$RELEASE_MODE" == notarized && "$PRERELEASE" == false ]]; then
             gh release upload "$TAG" release-assets/appcast.xml release-assets/appcast-x86_64.xml
             gh release edit "$TAG" --draft=false --latest=true
