@@ -8,7 +8,7 @@ description_i18n:
   zh: 把人文照片、风景和一串持续出现的时间叠在一起的可视时间项目，受三体“智子”意象启发。
   en: A visible time project layering a continuous time code over human scenes and landscapes, inspired by the sophon idea in The Three-Body Problem.
 type: frontend
-version: 0.5.1
+version: 0.5.2
 route: /x/zhizi-time
 frontend:
   entry: dist

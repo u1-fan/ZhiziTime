@@ -2,7 +2,7 @@
 
 官网地址：<https://zhizi-time.u1.fan/>
 
-这是 macOS 智子时间项目的官网静态页面。它使用人文照片作为底层画面，把 `YYYY-MM-DD HH:MM:SS` 时间码固定在中央，并提供 GitHub Releases 下载入口。
+这是 macOS 智子时间项目的官网静态页面。人文照片作为底层画面，`YYYY-MM-DD HH:MM:SS` 时间码固定在中央，下载入口指向 GitHub Releases。
 
 ## 本地预览
 
