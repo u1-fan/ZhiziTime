@@ -28,7 +28,7 @@
 
 从 [Releases](https://github.com/u1-fan/ZhiziTime/releases) 下载最新版本。Release workflow 为 Apple Silicon（`arm64`）和 Intel（`x86_64`）生成 DMG：
 
-1. 下载对应架构的 `ZhiziTime-v1.0.0-macOS-<arch>.dmg`。
+1. 下载对应架构的 `ZhiziTime-v1.0.1-rc.1-macOS-<arch>.dmg`。
 2. 打开 DMG，将 `ZhiziTime.app` 拖到 `Applications`。
 3. 首次打开时，如果 macOS 提示无法验证开发者，请在 Finder 中右键应用，选择“打开”，再确认打开。
 4. 已配置 Sparkle 的稳定公证版本会在菜单栏提供“检查更新…”。
